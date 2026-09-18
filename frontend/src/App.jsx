@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { 
   Shield, 
   ShieldAlert, 
-  BarChart3, 
   History, 
   Layers, 
   BookOpen, 
@@ -379,14 +378,7 @@ export default function App() {
             <Shield size={18} />
             AI Image Spotting
           </button>
-          
-          <button 
-            className={`nav-item ${page === 'dashboard' ? 'active' : ''}`}
-            onClick={() => setPage("dashboard")}
-          >
-            <BarChart3 size={18} />
-            Analytics Dashboard
-          </button>
+
           
           <button 
             className={`nav-item ${page === 'history' ? 'active' : ''}`}
@@ -597,84 +589,6 @@ export default function App() {
           </div>
         )}
 
-        {/* -------------------------------------------------------------
-            PAGE 2: DASHBOARD
-           ------------------------------------------------------------- */}
-        {page === 'dashboard' && (
-          <div>
-            <div className="page-header">
-              <h1>📊 Analytics Dashboard</h1>
-              <p>Chronological summaries and prediction ratios calculated over the current session.</p>
-            </div>
-
-            {history.length === 0 ? (
-              <div className="card" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-slate)' }}>
-                <ImageIcon size={48} style={{ opacity: 0.3, marginBottom: '1rem' }} />
-                <p>No queries logged yet. Analyze images in the <strong>AI Image Spotting</strong> tab to view analytics.</p>
-              </div>
-            ) : (
-              <div>
-                <div className="stats-grid">
-                  <div className="stat-card">
-                    <span className="stat-label">Total Queries</span>
-                    <span className="stat-value">{history.length}</span>
-                  </div>
-                  <div className="stat-card">
-                    <span className="stat-label">AI Detected</span>
-                    <span className="stat-value" style={{ color: 'var(--accent-ai)' }}>
-                      {history.filter(x => x.verdict === 'AI').length}
-                    </span>
-                  </div>
-                  <div className="stat-card">
-                    <span className="stat-label">Real Detected</span>
-                    <span className="stat-value" style={{ color: 'var(--accent-real)' }}>
-                      {history.filter(x => x.verdict === 'REAL').length}
-                    </span>
-                  </div>
-                  <div className="stat-card">
-                    <span className="stat-label">AI Flag Ratio</span>
-                    <span className="stat-value">
-                      {((history.filter(x => x.verdict === 'AI').length / history.length) * 100).toFixed(1)}%
-                    </span>
-                  </div>
-                </div>
-
-                <div className="card">
-                  <h3>📋 Historical Query Log</h3>
-                  <table className="exif-table" style={{ marginTop: '1rem' }}>
-                    <thead>
-                      <tr>
-                        <th>Date & Time</th>
-                        <th>Filename</th>
-                        <th>Classification Engine</th>
-                        <th>Verdict</th>
-                        <th>AI Score</th>
-                        <th>Real Score</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {history.map((log) => (
-                        <tr key={log.id}>
-                          <td>{log.timestamp}</td>
-                          <td style={{ fontWeight: 600 }}>{log.filename}</td>
-                          <td>{log.model}</td>
-                          <td style={{ 
-                            fontWeight: 700, 
-                            color: log.verdict === 'AI' ? 'var(--accent-ai)' : 'var(--accent-real)' 
-                          }}>
-                            {log.verdict}
-                          </td>
-                          <td>{(log.fake_score*100).toFixed(1)}%</td>
-                          <td>{(log.real_score*100).toFixed(1)}%</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* -------------------------------------------------------------
             PAGE 3: HISTORY
