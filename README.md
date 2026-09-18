@@ -1,6 +1,6 @@
 # AI Image Spotting Portal 🖼️🛡️
 
-A premium, modern web application designed to analyze image pixel grids, metadata structures, and compression error levels to classify and spot AI-generated images vs. authentic camera photographs.
+A premium, modern web application designed to analyze image pixel grids, metadata structures, and compression error levels to classify and spot AI-generated images vs. real camera photographs.
 
 Built with a **Decoupled FastAPI Python Backend** (powered by the **SigLIP Transformer model**) and a **Crisp Light React + Vite Frontend**.
 

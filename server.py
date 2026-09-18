@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
 
 # Import workspace modules
-from forensics import compute_ela, compute_fft, extract_metadata, generate_forensic_reasons
+from forensics import compute_ela, compute_fft, extract_metadata, generate_forensic_reasons, generate_diagnostic_report
 from models import classify_image, classify_real_category
 from config import DEFAULT_MODEL
 
@@ -60,6 +60,7 @@ async def analyze_image(
         fft_img = compute_fft(image)
         
         # 3. Generate diagnostic reasoning report
+        report = generate_diagnostic_report(classification, metadata, ela_img, fft_img)
         reasons = generate_forensic_reasons(classification, metadata, ela_img, fft_img)
         
         # Convert visual assets to base64 URIs
@@ -71,11 +72,14 @@ async def analyze_image(
             "filename": file.filename,
             "model": model_id,
             "verdict": classification["verdict"],
+            "verdict_label": report["verdict_banner"]["verdict"],
+            "summary": report["verdict_banner"]["summary"],
             "fake_score": classification["fake_score"],
             "real_score": classification["real_score"],
             "raw": classification["raw"],
             "metadata": metadata,
             "reasons": reasons,
+            "diagnostic_report": report,
             "ela_base64": ela_b64,
             "fft_base64": fft_b64
         }
@@ -110,6 +114,7 @@ async def analyze_url_image(
         fft_img = compute_fft(image)
         
         # 3. Generate diagnostic reasoning report
+        report = generate_diagnostic_report(classification, metadata, ela_img, fft_img)
         reasons = generate_forensic_reasons(classification, metadata, ela_img, fft_img)
         
         # Convert visual assets to base64 URIs
@@ -121,11 +126,14 @@ async def analyze_url_image(
             "filename": url.split("/")[-1].split("?")[0] or "url_image.jpg",
             "model": model_id,
             "verdict": classification["verdict"],
+            "verdict_label": report["verdict_banner"]["verdict"],
+            "summary": report["verdict_banner"]["summary"],
             "fake_score": classification["fake_score"],
             "real_score": classification["real_score"],
             "raw": classification["raw"],
             "metadata": metadata,
             "reasons": reasons,
+            "diagnostic_report": report,
             "ela_base64": ela_b64,
             "fft_base64": fft_b64
         }

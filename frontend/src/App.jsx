@@ -11,6 +11,9 @@ import {
   CheckSquare, 
   Trash2, 
   Download, 
+  ChevronDown,
+  ChevronUp,
+  Info,
   Image as ImageIcon 
 } from 'lucide-react';
 
@@ -29,7 +32,7 @@ const SAMPLE_IMAGES = {
   "Real Nature Landscape": {
     "url": "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?q=80&w=500",
     "type": "REAL",
-    "description": "Authentic nature photography showing complex natural fractals and light dispersion."
+    "description": "Real nature photography showing complex natural fractals and light dispersion."
   },
   "AI Generated Landscape": {
     "url": "https://raw.githubusercontent.com/huggingface/diffusers/main/docs/source/en/images/stable_diffusion_15.png",
@@ -124,6 +127,8 @@ export default function App() {
   const [elaQuality, setElaQuality] = useState(90);
   const [recalculatingEla, setRecalculatingEla] = useState(false);
   const [customElaUri, setCustomElaUri] = useState("");
+  const [showTechDetails, setShowTechDetails] = useState(false);
+  const [showHistoryTechDetails, setShowHistoryTechDetails] = useState(false);
   
   // Trust Checklist anomalies state
   const [anomalies, setAnomalies] = useState({
@@ -147,6 +152,7 @@ export default function App() {
     });
     setElaQuality(90);
     setCustomElaUri("");
+    setShowTechDetails(false);
   }, [result]);
 
   // Recalculate combined scores based on checkboxes
@@ -259,9 +265,12 @@ export default function App() {
       filename: data.filename,
       model: "SigLIP High-Res Classifier",
       verdict: data.verdict,
+      verdict_label: data.verdict_label || (data.verdict === 'AI' ? 'Likely AI-Generated' : 'Likely Real'),
+      summary: data.summary || (data.diagnostic_report?.verdict_banner?.summary ?? ""),
       fake_score: data.fake_score,
       real_score: data.real_score,
       reasons: data.reasons,
+      diagnostic_report: data.diagnostic_report,
       thumbnail: compressedThumb
     };
     setHistory(prev => [newLog, ...prev]);
@@ -305,6 +314,7 @@ export default function App() {
             id: Date.now() + i,
             filename: file.name,
             verdict: data.verdict,
+            verdict_label: data.verdict_label || (data.verdict === 'AI' ? 'Likely AI-Generated' : 'Likely Real'),
             fake_score: data.fake_score,
             real_score: data.real_score,
             thumbnail: thumbUri
@@ -340,7 +350,8 @@ export default function App() {
   const handleExportCSV = () => {
     let csvContent = "data:text/csv;charset=utf-8,Filename,Verdict,AI Confidence,Real Confidence\n";
     batchResults.forEach(item => {
-      csvContent += `"${item.filename}","${item.verdict}","${(item.fake_score*100).toFixed(1)}%","${(item.real_score*100).toFixed(1)}%"\n`;
+      const vLabel = item.verdict_label || (item.verdict === 'AI' ? 'Likely AI-Generated' : (item.verdict === 'REAL' ? 'Likely Real' : item.verdict));
+      csvContent += `"${item.filename}","${vLabel}","${(item.fake_score*100).toFixed(1)}%","${(item.real_score*100).toFixed(1)}%"\n`;
     });
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -513,17 +524,17 @@ export default function App() {
                     <div className="verdict-banner ai">
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <ShieldAlert size={24} />
-                        <h3>DETECTION: AI GENERATED IMAGE</h3>
+                        <h3>VERDICT: LIKELY AI-GENERATED</h3>
                       </div>
-                      <p>The model identified synthetic grid anomalies with <strong>{(result.fake_score*100).toFixed(1)}%</strong> confidence.</p>
+                      <p>{result.summary || `Our AI model found visual patterns that are more consistent with AI-generated images (${(result.fake_score*100).toFixed(1)}% confidence).`}</p>
                     </div>
                   ) : (
                     <div className="verdict-banner real">
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <Shield size={24} />
-                        <h3>DETECTION: AUTHENTIC PHOTOGRAPH</h3>
+                        <h3>VERDICT: LIKELY REAL</h3>
                       </div>
-                      <p>The model verified camera acquisition patterns with <strong>{(result.real_score*100).toFixed(1)}%</strong> confidence.</p>
+                      <p>{result.summary || `Our AI model found visual patterns that are more consistent with a natural photograph than with synthetic images (${(result.real_score*100).toFixed(1)}% confidence).`}</p>
                     </div>
                   )}
 
@@ -555,33 +566,140 @@ export default function App() {
                 </div>
               )}
 
-              {/* Column 3: Reasoning Report when predicted */}
+              {/* Column 3: Diagnostic Report when predicted */}
               {result && (
                 <div>
                   <div className="card" style={{ margin: 0, height: '100%' }}>
-                    <h3>🧠 Reasoning Report</h3>
+                    <h3>🧠 Why did we reach this verdict?</h3>
                     <p style={{ fontSize: '0.85rem', color: 'var(--text-slate)', marginBottom: '1.25rem' }}>
-                      Diagnostic criteria evaluated for {result.filename}:
+                      Explainable evidence evaluated for {result.filename}:
                     </p>
+
+                    {result.diagnostic_report?.contradiction_note && (
+                      <div className="contradiction-notice">
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                          <Info size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
+                          <span>{result.diagnostic_report.contradiction_note}</span>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="reasons-list">
-                      {result.reasons.map((r, i) => {
-                        const isObj = typeof r === 'object' && r !== null;
-                        const type = isObj ? (r.type || 'neutral') : 'neutral';
-                        const icon = isObj ? r.icon : 'ℹ️';
-                        const label = isObj ? r.label : 'Diagnostic Audit';
-                        const detail = isObj ? r.detail : String(r).replace(/\*\*/g, '');
-                        
-                        return (
-                          <div key={i} className={`reason-item-card ${type}`}>
-                            <span className="reason-icon">{icon}</span>
+                      {result.diagnostic_report?.evidence_cards ? (
+                        result.diagnostic_report.evidence_cards.map((card, i) => (
+                          <div key={i} className={`reason-item-card ${card.status_type || 'neutral'}`}>
+                            <span className="reason-icon">{card.icon}</span>
                             <div className="reason-content">
-                              <strong className="reason-label">{label}</strong>
-                              <p className="reason-detail">{detail}</p>
+                              <div className="evidence-header">
+                                <strong className="reason-label" style={{ marginBottom: 0 }}>{card.title}</strong>
+                                <span className={`status-badge ${card.status_type || 'neutral'}`}>
+                                  {card.status}
+                                </span>
+                              </div>
+                              <p className="reason-detail">{card.explanation}</p>
                             </div>
                           </div>
-                        );
-                      })}
+                        ))
+                      ) : (
+                        result.reasons?.map((r, i) => {
+                          const isObj = typeof r === 'object' && r !== null;
+                          const type = isObj ? (r.type || 'neutral') : 'neutral';
+                          const icon = isObj ? r.icon : 'ℹ️';
+                          const label = isObj ? r.label : 'Diagnostic Audit';
+                          const detail = isObj ? r.detail : String(r).replace(/\*\*/g, '');
+                          
+                          return (
+                            <div key={i} className={`reason-item-card ${type}`}>
+                              <span className="reason-icon">{icon}</span>
+                              <div className="reason-content">
+                                <strong className="reason-label">{label}</strong>
+                                <p className="reason-detail">{detail}</p>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
                     </div>
+
+                    {result.diagnostic_report?.technical_details && (
+                      <div>
+                        <button
+                          type="button"
+                          className="tech-toggle-btn"
+                          onClick={() => setShowTechDetails(prev => !prev)}
+                        >
+                          <span>View Technical Details</span>
+                          {showTechDetails ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                        </button>
+
+                        {showTechDetails && (
+                          <div className="tech-drawer">
+                            <div className="tech-grid">
+                              <div className="tech-metric-card">
+                                <span className="tech-metric-title">Model</span>
+                                <span className="tech-metric-value" style={{ fontSize: '0.92rem' }}>
+                                  {result.diagnostic_report.technical_details.model_name || 'SigLIP Classifier'}
+                                </span>
+                                <span className="tech-metric-sub">
+                                  AI: {(result.fake_score * 100).toFixed(1)}% | Real: {(result.real_score * 100).toFixed(1)}%
+                                </span>
+                              </div>
+                              <div className="tech-metric-card">
+                                <span className="tech-metric-title">Error Level Analysis</span>
+                                <span className="tech-metric-value">
+                                  {result.diagnostic_report.technical_details.ela_std}
+                                </span>
+                                <span className="tech-metric-sub">
+                                  Threshold: &gt; {result.diagnostic_report.technical_details.ela_threshold} std
+                                </span>
+                              </div>
+                              <div className="tech-metric-card">
+                                <span className="tech-metric-title">FFT Frequency</span>
+                                <span className="tech-metric-value">
+                                  {result.diagnostic_report.technical_details.fft_std}
+                                </span>
+                                <span className="tech-metric-sub">
+                                  Threshold: &gt; {result.diagnostic_report.technical_details.fft_threshold} std
+                                </span>
+                              </div>
+                              <div className="tech-metric-card">
+                                <span className="tech-metric-title">Metadata Audit</span>
+                                <span className="tech-metric-value">
+                                  {result.diagnostic_report.technical_details.has_exif ? `${result.diagnostic_report.technical_details.metadata_count} tags` : 'No EXIF'}
+                                </span>
+                                <span className="tech-metric-sub">
+                                  {result.diagnostic_report.technical_details.ai_signatures?.length > 0 
+                                    ? `AI Sigs: ${result.diagnostic_report.technical_details.ai_signatures.join(', ')}`
+                                    : 'No direct AI tags'}
+                                </span>
+                              </div>
+                            </div>
+
+                            {result.diagnostic_report.technical_details.metadata_tags && Object.keys(result.diagnostic_report.technical_details.metadata_tags).length > 0 && (
+                              <div style={{ marginTop: '0.75rem', maxHeight: '180px', overflowY: 'auto' }}>
+                                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-slate)' }}>Raw Metadata Headers:</span>
+                                <table className="exif-table" style={{ marginTop: '0.35rem', fontSize: '0.8rem' }}>
+                                  <thead>
+                                    <tr>
+                                      <th style={{ padding: '0.4rem 0.6rem' }}>Tag</th>
+                                      <th style={{ padding: '0.4rem 0.6rem' }}>Value</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {Object.entries(result.diagnostic_report.technical_details.metadata_tags).map(([k, v]) => (
+                                      <tr key={k}>
+                                        <td style={{ padding: '0.4rem 0.6rem', fontWeight: 600 }}>{k}</td>
+                                        <td style={{ padding: '0.4rem 0.6rem' }}>{String(v)}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -651,7 +769,7 @@ export default function App() {
                           fontWeight: 700, 
                           color: log.verdict === 'AI' ? (inspectLog?.id === log.id ? '#ffffff' : 'var(--accent-ai)') : (inspectLog?.id === log.id ? '#ffffff' : 'var(--accent-real)')
                         }}>
-                          {log.verdict}
+                          {log.verdict_label || (log.verdict === 'AI' ? 'Likely AI-Generated' : 'Likely Real')}
                         </span>
                       </div>
                     ))}
@@ -683,8 +801,13 @@ export default function App() {
                                 color: inspectLog.verdict === 'AI' ? 'var(--accent-ai)' : 'var(--accent-real)',
                                 backgroundColor: inspectLog.verdict === 'AI' ? 'var(--accent-ai-bg)' : 'var(--accent-real-bg)'
                               }}>
-                                Verdict: {inspectLog.verdict}
+                                Verdict: {inspectLog.verdict_label || (inspectLog.verdict === 'AI' ? 'Likely AI-Generated' : 'Likely Real')}
                               </span>
+                              {inspectLog.summary && (
+                                <p style={{ marginTop: '0.75rem', fontSize: '0.88rem', color: 'var(--text-slate)', lineHeight: '1.4' }}>
+                                  {inspectLog.summary}
+                                </p>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -699,28 +822,144 @@ export default function App() {
                           </div>
                         </div>
 
-                        <div style={{ marginTop: '1.5rem' }}>
-                          <h4>Logged Reasons:</h4>
-                          <div className="reasons-list" style={{ marginTop: '0.5rem' }}>
-                            {inspectLog.reasons.map((r, i) => {
-                              const isObj = typeof r === 'object' && r !== null;
-                              const type = isObj ? (r.type || 'neutral') : 'neutral';
-                              const icon = isObj ? r.icon : 'ℹ️';
-                              const label = isObj ? r.label : 'Diagnostic Audit';
-                              const detail = isObj ? r.detail : String(r).replace(/\*\*/g, '');
-                              
-                              return (
-                                <div key={i} className={`reason-item-card ${type}`}>
-                                  <span className="reason-icon">{icon}</span>
-                                  <div className="reason-content">
-                                    <strong className="reason-label">{label}</strong>
-                                    <p className="reason-detail">{detail}</p>
-                                  </div>
-                                </div>
-                              );
-                            })}
+                        <div className="meter-section" style={{ marginTop: '0.75rem' }}>
+                          <div className="meter-header">
+                            <span>Real Confidence Score</span>
+                            <span style={{ color: 'var(--accent-real)' }}>{(inspectLog.real_score*100).toFixed(1)}%</span>
+                          </div>
+                          <div className="meter-track">
+                            <div className="meter-fill real" style={{ width: `${inspectLog.real_score*100}%` }}></div>
                           </div>
                         </div>
+
+                        {inspectLog.diagnostic_report?.contradiction_note && (
+                          <div className="contradiction-notice" style={{ marginTop: '1.25rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                              <Info size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
+                              <span>{inspectLog.diagnostic_report.contradiction_note}</span>
+                            </div>
+                          </div>
+                        )}
+
+                        <div style={{ marginTop: '1.5rem' }}>
+                          <h4>Why did we reach this verdict?</h4>
+                          <div className="reasons-list" style={{ marginTop: '0.75rem' }}>
+                            {inspectLog.diagnostic_report?.evidence_cards ? (
+                              inspectLog.diagnostic_report.evidence_cards.map((card, i) => (
+                                <div key={i} className={`reason-item-card ${card.status_type || 'neutral'}`}>
+                                  <span className="reason-icon">{card.icon}</span>
+                                  <div className="reason-content">
+                                    <div className="evidence-header">
+                                      <strong className="reason-label" style={{ marginBottom: 0 }}>{card.title}</strong>
+                                      <span className={`status-badge ${card.status_type || 'neutral'}`}>
+                                        {card.status}
+                                      </span>
+                                    </div>
+                                    <p className="reason-detail">{card.explanation}</p>
+                                  </div>
+                                </div>
+                              ))
+                            ) : (
+                              inspectLog.reasons?.map((r, i) => {
+                                const isObj = typeof r === 'object' && r !== null;
+                                const type = isObj ? (r.type || 'neutral') : 'neutral';
+                                const icon = isObj ? r.icon : 'ℹ️';
+                                const label = isObj ? r.label : 'Diagnostic Audit';
+                                const detail = isObj ? r.detail : String(r).replace(/\*\*/g, '');
+                                
+                                return (
+                                  <div key={i} className={`reason-item-card ${type}`}>
+                                    <span className="reason-icon">{icon}</span>
+                                    <div className="reason-content">
+                                      <strong className="reason-label">{label}</strong>
+                                      <p className="reason-detail">{detail}</p>
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+
+                        {inspectLog.diagnostic_report?.technical_details && (
+                          <div>
+                            <button
+                              type="button"
+                              className="tech-toggle-btn"
+                              onClick={() => setShowHistoryTechDetails(prev => !prev)}
+                            >
+                              <span>View Technical Details</span>
+                              {showHistoryTechDetails ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                            </button>
+
+                            {showHistoryTechDetails && (
+                              <div className="tech-drawer">
+                                <div className="tech-grid">
+                                  <div className="tech-metric-card">
+                                    <span className="tech-metric-title">Model</span>
+                                    <span className="tech-metric-value" style={{ fontSize: '0.92rem' }}>
+                                      {inspectLog.diagnostic_report.technical_details.model_name || 'SigLIP Classifier'}
+                                    </span>
+                                    <span className="tech-metric-sub">
+                                      AI: {(inspectLog.fake_score * 100).toFixed(1)}% | Real: {(inspectLog.real_score * 100).toFixed(1)}%
+                                    </span>
+                                  </div>
+                                  <div className="tech-metric-card">
+                                    <span className="tech-metric-title">Error Level Analysis</span>
+                                    <span className="tech-metric-value">
+                                      {inspectLog.diagnostic_report.technical_details.ela_std}
+                                    </span>
+                                    <span className="tech-metric-sub">
+                                      Threshold: &gt; {inspectLog.diagnostic_report.technical_details.ela_threshold} std
+                                    </span>
+                                  </div>
+                                  <div className="tech-metric-card">
+                                    <span className="tech-metric-title">FFT Frequency</span>
+                                    <span className="tech-metric-value">
+                                      {inspectLog.diagnostic_report.technical_details.fft_std}
+                                    </span>
+                                    <span className="tech-metric-sub">
+                                      Threshold: &gt; {inspectLog.diagnostic_report.technical_details.fft_threshold} std
+                                    </span>
+                                  </div>
+                                  <div className="tech-metric-card">
+                                    <span className="tech-metric-title">Metadata Audit</span>
+                                    <span className="tech-metric-value">
+                                      {inspectLog.diagnostic_report.technical_details.has_exif ? `${inspectLog.diagnostic_report.technical_details.metadata_count} tags` : 'No EXIF'}
+                                    </span>
+                                    <span className="tech-metric-sub">
+                                      {inspectLog.diagnostic_report.technical_details.ai_signatures?.length > 0 
+                                        ? `AI Sigs: ${inspectLog.diagnostic_report.technical_details.ai_signatures.join(', ')}`
+                                        : 'No direct AI tags'}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {inspectLog.diagnostic_report.technical_details.metadata_tags && Object.keys(inspectLog.diagnostic_report.technical_details.metadata_tags).length > 0 && (
+                                  <div style={{ marginTop: '0.75rem', maxHeight: '180px', overflowY: 'auto' }}>
+                                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-slate)' }}>Raw Metadata Headers:</span>
+                                    <table className="exif-table" style={{ marginTop: '0.35rem', fontSize: '0.8rem' }}>
+                                      <thead>
+                                        <tr>
+                                          <th style={{ padding: '0.4rem 0.6rem' }}>Tag</th>
+                                          <th style={{ padding: '0.4rem 0.6rem' }}>Value</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {Object.entries(inspectLog.diagnostic_report.technical_details.metadata_tags).map(([k, v]) => (
+                                          <tr key={k}>
+                                            <td style={{ padding: '0.4rem 0.6rem', fontWeight: 600 }}>{k}</td>
+                                            <td style={{ padding: '0.4rem 0.6rem' }}>{String(v)}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-slate)' }}>
@@ -819,7 +1058,7 @@ export default function App() {
                             fontWeight: 700, 
                             color: item.verdict === 'AI' ? 'var(--accent-ai)' : (item.verdict === 'REAL' ? 'var(--accent-real)' : '#6b7280') 
                           }}>
-                            {item.verdict}
+                            {item.verdict_label || (item.verdict === 'AI' ? 'Likely AI-Generated' : (item.verdict === 'REAL' ? 'Likely Real' : item.verdict))}
                           </td>
                           <td>{(item.fake_score*100).toFixed(1)}%</td>
                           <td>{(item.real_score*100).toFixed(1)}%</td>
@@ -832,7 +1071,7 @@ export default function App() {
                 <div className="card">
                   <h3>🖼️ Grid Results Gallery</h3>
                   <p style={{ color: 'var(--text-slate)', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
-                    Visual gallery results. Green border signifies REAL, Red border signifies AI.
+                    Visual gallery results. Green border signifies Likely Real, Red border signifies Likely AI-Generated.
                   </p>
 
                   <div className="batch-grid">
@@ -843,7 +1082,7 @@ export default function App() {
                         style={{ borderColor: item.verdict === 'AI' ? 'var(--accent-ai)' : (item.verdict === 'REAL' ? 'var(--accent-real)' : '#e2e8f0') }}
                       >
                         <span className={`batch-badge ${item.verdict === 'AI' ? 'ai' : 'real'}`}>
-                          {item.verdict}
+                          {item.verdict_label || (item.verdict === 'AI' ? 'Likely AI-Generated' : (item.verdict === 'REAL' ? 'Likely Real' : item.verdict))}
                         </span>
                         <p style={{ fontSize: '0.75rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>
                           {item.filename}

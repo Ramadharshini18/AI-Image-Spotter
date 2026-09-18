@@ -126,7 +126,7 @@ def extract_metadata(image: Image.Image) -> dict:
     if ai_signatures:
         impact = "🚨 AI Software signature detected directly in EXIF metadata tags! (Highly likely AI)"
     elif has_camera_data:
-        impact = "📸 Authentic camera hardware metadata (Make/Model) detected. (Highly likely Real)"
+        impact = "📸 Camera hardware metadata (Make/Model) detected. (Highly likely Real)"
     else:
         impact = "ℹ️ Metadata present but contains no camera hardware parameters (Neutral)."
         
@@ -137,109 +137,201 @@ def extract_metadata(image: Image.Image) -> dict:
         "verdict_impact": impact
     }
 
-def generate_forensic_reasons(classification: dict, metadata: dict, ela_image: Image.Image, fft_image: Image.Image) -> list:
+def generate_diagnostic_report(classification: dict, metadata: dict, ela_image: Image.Image, fft_image: Image.Image) -> dict:
     """
-    Generates structured reason objects for classification based on 
-    the model prediction, EXIF metadata tags, and image pixel statistical analysis.
+    Generates a human-centered, explainable diagnostic report.
+    Explains the finding in simple, cautious language ('Likely AI-Generated' or 'Likely Real')
+    with 4 structured evidence cards and a collapsible technical details payload.
     """
-    reasons = []
-    verdict = classification.get("verdict")
-    fake_prob = classification.get("fake_score", 0.5)
-    real_prob = classification.get("real_score", 0.5)
-    
-    # 1. Neural Transformer Check
-    if verdict == "AI":
-        reasons.append({
-            "type": "ai",
-            "icon": "🤖",
-            "label": "Neural Check",
-            "detail": f"The Transformer model flagged generative textures and pixel patch anomalies with {fake_prob:.1%} confidence."
-        })
-    else:
-        reasons.append({
-            "type": "real",
-            "icon": "🟢",
-            "label": "Neural Check",
-            "detail": f"The Transformer model verified natural skin, hair, or landscape fractal structures with {real_prob:.1%} confidence."
-        })
-        
-    # 2. EXIF Metadata Auditor
-    if metadata["has_exif"]:
-        if metadata["ai_signatures"]:
-            reasons.append({
-                "type": "ai",
-                "icon": "🚨",
-                "label": "EXIF Audit",
-                "detail": f"Direct AI generator software signatures detected in metadata tags: {', '.join(metadata['ai_signatures'])}."
-            })
-        elif "Make" in metadata["details"] or "Model" in metadata["details"]:
-            make = metadata["details"].get("Make", "Unknown")
-            model = metadata["details"].get("Model", "Unknown")
-            reasons.append({
-                "type": "real",
-                "icon": "📸",
-                "label": "EXIF Audit",
-                "detail": f"Found authentic camera hardware metadata (Make: {make}, Model: {model}), indicating physical capture."
-            })
+    fake_prob = float(classification.get("fake_score", 0.5))
+    real_prob = float(classification.get("real_score", 0.5))
+    is_ai = fake_prob >= 0.5
+
+    # 1. Cautious Verdict Label & Summary
+    if is_ai:
+        verdict_label = "Likely AI-Generated"
+        if fake_prob >= 0.85:
+            summary = "Our AI model found strong visual patterns that are more consistent with AI-generated images."
+        elif fake_prob >= 0.65:
+            summary = "Our AI model found visual patterns that are more consistent with AI-generated images."
         else:
-            reasons.append({
-                "type": "neutral",
-                "icon": "ℹ️",
-                "label": "EXIF Audit",
-                "detail": "Metadata tags are present but contain no physical camera hardware parameters."
-            })
+            summary = "Our AI model found visual patterns that lean towards AI-generated images, though the margin is close."
     else:
-        reasons.append({
-            "type": "neutral",
-            "icon": "ℹ️",
-            "label": "EXIF Audit",
-            "detail": "No metadata headers found. This is typical of screenshots, web downloads, or direct AI exports."
-        })
-        
-    # 3. ELA Pixel Statistics (Standard Deviation of Grayscale ELA highlights)
+        verdict_label = "Likely Real"
+        if real_prob >= 0.85:
+            summary = "Our AI model found visual patterns that are more consistent with a natural photograph than with the AI-generated images it has learned from."
+        elif real_prob >= 0.65:
+            summary = "Our AI model found visual patterns that are more consistent with a natural photograph than with synthetic images."
+        else:
+            summary = "Our AI model found visual patterns that lean towards a natural photograph, though the margin is close."
+
+    # 2. Measured forensic values
+    ela_std = 0.0
     try:
         ela_gray = ela_image.convert("L")
-        ela_arr = np.array(ela_gray)
-        ela_std = ela_arr.std()
-        
-        if ela_std > 12.0:
-            reasons.append({
-                "type": "ai",
-                "icon": "🔍",
-                "label": "Error Level Analysis",
-                "detail": f"High compression variance detected (std={ela_std:.1f}). This highlights regional compression offsets typical of digital editing or localized patch rendering."
-            })
-        else:
-            reasons.append({
-                "type": "real",
-                "icon": "real",
-                "label": "Error Level Analysis",
-                "detail": f"Compression error levels are uniform (std={ela_std:.1f}). No localized editing or patch splicing detected."
-            })
-    except Exception:
-         pass
-         
-    # 4. FFT Checkerboard Grid Auditor
-    try:
-        fft_gray = fft_image.convert("L")
-        fft_arr = np.array(fft_gray)
-        fft_std = fft_arr.std()
-        
-        if fft_std > 42.0:
-            reasons.append({
-                "type": "ai",
-                "icon": "📊",
-                "label": "FFT Spectrum",
-                "detail": f"Bright periodic frequencies detected (std={fft_std:.1f}). This indicates checkerboard upsampling patterns left by neural generator filters."
-            })
-        else:
-            reasons.append({
-                "type": "real",
-                "icon": "real",
-                "label": "FFT Spectrum",
-                "detail": f"Grayscale frequency spectrum decays smoothly (std={fft_std:.1f}), characteristic of natural camera exposure."
-            })
+        ela_std = float(np.array(ela_gray).std())
     except Exception:
         pass
-        
+
+    fft_std = 0.0
+    try:
+        fft_gray = fft_image.convert("L")
+        fft_std = float(np.array(fft_gray).std())
+    except Exception:
+        pass
+
+    # 3. 4 User-Friendly Evidence Cards
+    evidence_cards = []
+
+    # Card 1: Visual Pattern Check
+    if is_ai:
+        v_status = "Supports AI suspicion"
+        v_type = "ai"
+        v_icon = "🤖"
+        if fake_prob >= 0.85:
+            v_explanation = f"The visual characteristics show strong patterns commonly produced by generative AI systems recognized by our model (confidence: {fake_prob:.1%})."
+        else:
+            v_explanation = f"The visual characteristics lean closer to AI-generated examples recognized by our model (confidence: {fake_prob:.1%})."
+    else:
+        v_status = "Supports Real"
+        v_type = "real"
+        v_icon = "📷"
+        if real_prob >= 0.85:
+            v_explanation = f"The image's visual characteristics are strongly consistent with the real photographs recognized by our model (confidence: {real_prob:.1%})."
+        else:
+            v_explanation = f"The image's visual characteristics are more consistent with natural photographs recognized by our model (confidence: {real_prob:.1%})."
+
+    evidence_cards.append({
+        "category": "Visual Pattern Check",
+        "title": "Visual Pattern Check",
+        "status": v_status,
+        "status_type": v_type,
+        "icon": v_icon,
+        "explanation": v_explanation
+    })
+
+    # Card 2: Image Information
+    details = metadata.get("details", {})
+    ai_sigs = metadata.get("ai_signatures", [])
+    has_camera_data = any(tag in details for tag in ["Make", "Model", "LensModel", "ExposureTime", "FNumber", "ISOSpeedRatings", "FocalLength"])
+
+    if ai_sigs:
+        info_status = "Supports AI suspicion"
+        info_type = "ai"
+        info_icon = "🚨"
+        info_explanation = f"Direct AI generator software signatures ({', '.join(ai_sigs)}) were detected in the file's information headers."
+    elif has_camera_data:
+        make = details.get("Make", "")
+        model = details.get("Model", "")
+        camera_desc = f"{make} {model}".strip() or "Standard Camera"
+        info_status = "Supports Real"
+        info_type = "real"
+        info_icon = "📸"
+        info_explanation = f"Camera hardware information was found ({camera_desc}). While this is typical of a physical camera capture, metadata can sometimes be preserved or edited."
+    else:
+        info_status = "Inconclusive"
+        info_type = "neutral"
+        info_icon = "ℹ️"
+        info_explanation = "No camera information was found in this file. This does not establish whether the image is real or AI-generated, as web platforms, social media, and screenshots commonly remove metadata."
+
+    evidence_cards.append({
+        "category": "Image Information",
+        "title": "Image Information",
+        "status": info_status,
+        "status_type": info_type,
+        "icon": info_icon,
+        "explanation": info_explanation
+    })
+
+    # Card 3: Editing & Compression Check
+    if ela_std > 12.0:
+        c_status = "Needs attention"
+        c_type = "warning"
+        c_icon = "⚠️"
+        c_explanation = f"Some areas show different compression patterns (measured variance: {ela_std:.1f}). This may be due to editing, repeated saving, or selective image processing."
+    else:
+        c_status = "Supports Real"
+        c_type = "real"
+        c_icon = "✅"
+        c_explanation = f"Compression patterns appear uniform across the image (measured variance: {ela_std:.1f}), showing no clear signs of localized editing or spliced areas."
+
+    evidence_cards.append({
+        "category": "Editing & Compression Check",
+        "title": "Editing & Compression Check",
+        "status": c_status,
+        "status_type": c_type,
+        "icon": c_icon,
+        "explanation": c_explanation
+    })
+
+    # Card 4: Image Pattern Analysis
+    if fft_std > 42.0:
+        p_status = "Supports AI suspicion"
+        p_type = "ai"
+        p_icon = "⚠️"
+        p_explanation = f"Unusual repeating pixel or frequency patterns were detected (measured variance: {fft_std:.1f}), which can be associated with synthetic or digitally processed images."
+    else:
+        p_status = "No clear evidence"
+        p_type = "neutral"
+        p_icon = "✅"
+        p_explanation = f"No strong unusual repeating frequency patterns were detected by this check (measured variance: {fft_std:.1f})."
+
+    evidence_cards.append({
+        "category": "Image Pattern Analysis",
+        "title": "Image Pattern Analysis",
+        "status": p_status,
+        "status_type": p_type,
+        "icon": p_icon,
+        "explanation": p_explanation
+    })
+
+    # Contradiction / Limitation Analysis
+    contradiction_note = None
+    if not is_ai and (ela_std > 12.0 or fft_std > 42.0):
+        contradiction_note = "Notice: Although the visual model leaned towards a real photo, compression or frequency patterns show localized variations. This frequently happens with images shared on social media, repeatedly saved, or lightly retouched."
+    elif is_ai and has_camera_data:
+        contradiction_note = "Notice: Camera hardware metadata was found, yet the visual model flagged synthetic generation patterns. Camera metadata can sometimes be preserved when editing or simulating an image."
+
+    # Technical Details Block
+    technical_details = {
+        "model_name": classification.get("model", "SigLIP High-Res Classifier"),
+        "raw_scores": classification.get("raw", []),
+        "fake_score": fake_prob,
+        "real_score": real_prob,
+        "ela_std": round(ela_std, 2),
+        "ela_threshold": 12.0,
+        "fft_std": round(fft_std, 2),
+        "fft_threshold": 42.0,
+        "has_exif": metadata.get("has_exif", False),
+        "metadata_count": len(details),
+        "metadata_tags": details,
+        "ai_signatures": ai_sigs
+    }
+
+    return {
+        "verdict_banner": {
+            "verdict": verdict_label,
+            "summary": summary,
+            "ai_confidence": fake_prob,
+            "real_confidence": real_prob
+        },
+        "evidence_cards": evidence_cards,
+        "contradiction_note": contradiction_note,
+        "technical_details": technical_details
+    }
+
+def generate_forensic_reasons(classification: dict, metadata: dict, ela_image: Image.Image, fft_image: Image.Image) -> list:
+    """
+    Backward-compatible adapter that maps generate_diagnostic_report cards
+    into the legacy reason list structure.
+    """
+    report = generate_diagnostic_report(classification, metadata, ela_image, fft_image)
+    reasons = []
+    for card in report["evidence_cards"]:
+        reasons.append({
+            "type": card["status_type"],
+            "icon": card["icon"],
+            "label": f"{card['title']} — {card['status']}",
+            "detail": card["explanation"]
+        })
     return reasons

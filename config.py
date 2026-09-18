@@ -29,7 +29,7 @@ SAMPLE_IMAGES = {
     "Real Nature Landscape": {
         "url": "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?q=80&w=500",
         "type": "REAL",
-        "description": "Authentic nature photography showing complex natural fractals and light dispersion."
+        "description": "Real nature photography showing complex natural fractals and light dispersion."
     },
     "AI Generated Landscape": {
         "url": "https://raw.githubusercontent.com/huggingface/diffusers/main/docs/source/en/images/stable_diffusion_15.png",
