@@ -1,63 +1,35 @@
-# AI Image Spotting Portal 🖼️🛡️
+# 🔍 AI Image Spotter
 
-A premium, modern web application designed to analyze image pixel grids, metadata structures, and compression error levels to classify and spot AI-generated images vs. real camera photographs.
+AI Image Spotter is a deep-learning application that classifies images as **real** or **AI-generated** using the **SigLIP vision-language model**.
 
-Built with a **Decoupled FastAPI Python Backend** (powered by the **SigLIP Transformer model**) and a **Crisp Light React + Vite Frontend**.
+## 🚀 Live Demo
 
----
+👉 [Try AI Image Spotter](https://ai-image-spotte.streamlit.app/)
 
-## 🎨 UI Features
-* **Hybrid Clean Layout**: An attractive, professional light mode workspace with high-contrast slate navy typography.
-* **3-Column Result Dashboard**:
-  * **Left**: Active Image thumbnail preview.
-  * **Middle**: Instant Verdict banner (AI vs. REAL) and probability meters.
-  * **Right**: Reasoning Report displaying neural audit details.
-* **Scan History Registry**: Persistent local session log to review, inspect, or delete previous queries.
-* **Batch processing**: Bulk upload module to audit multiple files simultaneously.
+## 📂 Source Code
 
----
+👉 [GitHub Repository](https://github.com/Ramadharshini18/AI-Image-Spotter)
 
-## 🚀 How to Run Locally
+## ✨ Features
 
-### 1. Backend Server Setup
-1. Navigate to the project root:
-   ```bash
-   pip install -r requirements.txt
-   ```
-2. Run the FastAPI development server:
-   ```bash
-   python server.py
-   ```
-   *The server runs at: http://127.0.0.1:8000*
+- Upload images for analysis.
+- Identify whether an image is likely to be real or AI-generated.
+- Display prediction results through an interactive interface.
+- Access the application online through Streamlit Cloud.
 
-### 2. Frontend Portal Setup
-1. Navigate to the frontend directory:
-   ```bash
-   cd frontend
-   ```
-2. Install dependencies and start the Vite server:
-   ```bash
-   npm install
-   npm run dev
-   ```
-   *The client portal runs at: http://localhost:5173*
+## 🛠️ Technologies Used
 
----
+- Python
+- Streamlit
+- PyTorch
+- Hugging Face Transformers
+- SigLIP
+- PIL
 
-## 📦 Production Deployment
+## ⚙️ Run Locally
 
-To deploy this application to the cloud (Render, Heroku, or Docker) without any **CORS** or **API Port connection errors**, follow these steps:
+### 1. Clone the Repository
 
-### Step A: Compile the Frontend React Assets
-From the root folder, compile your static React assets:
 ```bash
-npm run build --prefix frontend
-```
-*This compiles the portal and saves the files into `frontend/dist/`.*
-
-### Step B: Run the Combined Server
-Once built, FastAPI is configured to host the static assets directly. Just run your python app:
-```bash
-python server.py
-```
-FastAPI will now serve both the React website on the root path `/` and all API endpoints on the same port, ensuring same-origin mapping and eliminating CORS configurations!
+git clone https://github.com/Ramadharshini18/AI-Image-Spotter.git
+cd AI-Image-Spotter
