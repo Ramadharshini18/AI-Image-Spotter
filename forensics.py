@@ -145,7 +145,9 @@ def generate_diagnostic_report(classification: dict, metadata: dict, ela_image: 
     """
     fake_prob = float(classification.get("fake_score", 0.5))
     real_prob = float(classification.get("real_score", 0.5))
-    is_ai = fake_prob >= 0.5
+    verdict = classification.get("verdict", "UNCERTAIN")
+    is_ai = verdict == "AI"
+    is_uncertain = verdict == "UNCERTAIN"
 
     # 1. Cautious Verdict Label & Summary
     if is_ai:
@@ -156,6 +158,9 @@ def generate_diagnostic_report(classification: dict, metadata: dict, ela_image: 
             summary = "Our AI model found visual patterns that are more consistent with AI-generated images."
         else:
             summary = "Our AI model found visual patterns that lean towards AI-generated images, though the margin is close."
+    elif is_uncertain:
+        verdict_label = "Uncertain"
+        summary = "Our AI model found visual patterns that are mixed or highly ambiguous, falling into a neutral uncertainty zone."
     else:
         verdict_label = "Likely Real"
         if real_prob >= 0.85:
@@ -192,6 +197,11 @@ def generate_diagnostic_report(classification: dict, metadata: dict, ela_image: 
             v_explanation = f"The visual characteristics show strong patterns commonly produced by generative AI systems recognized by our model (confidence: {fake_prob:.1%})."
         else:
             v_explanation = f"The visual characteristics lean closer to AI-generated examples recognized by our model (confidence: {fake_prob:.1%})."
+    elif is_uncertain:
+        v_status = "Inconclusive"
+        v_type = "warning"
+        v_icon = "⚖️"
+        v_explanation = f"The visual characteristics are highly ambiguous. The model's confidence is split (AI: {fake_prob:.1%}, Real: {real_prob:.1%}), meaning it could not make a definitive classification."
     else:
         v_status = "Supports Real"
         v_type = "real"

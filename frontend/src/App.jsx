@@ -13,6 +13,8 @@ import {
   Download, 
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   Info,
   Image as ImageIcon 
 } from 'lucide-react';
@@ -129,6 +131,7 @@ export default function App() {
   const [customElaUri, setCustomElaUri] = useState("");
   const [showTechDetails, setShowTechDetails] = useState(false);
   const [showHistoryTechDetails, setShowHistoryTechDetails] = useState(false);
+  const [activeExplanationIndex, setActiveExplanationIndex] = useState(0);
   
   // Trust Checklist anomalies state
   const [anomalies, setAnomalies] = useState({
@@ -153,6 +156,7 @@ export default function App() {
     setElaQuality(90);
     setCustomElaUri("");
     setShowTechDetails(false);
+    setActiveExplanationIndex(0);
   }, [result]);
 
   // Recalculate combined scores based on checkboxes
@@ -346,21 +350,6 @@ export default function App() {
     setBatching(false);
   };
 
-  // Export Batch Results to CSV
-  const handleExportCSV = () => {
-    let csvContent = "data:text/csv;charset=utf-8,Filename,Verdict,AI Confidence,Real Confidence\n";
-    batchResults.forEach(item => {
-      const vLabel = item.verdict_label || (item.verdict === 'AI' ? 'Likely AI-Generated' : (item.verdict === 'REAL' ? 'Likely Real' : item.verdict));
-      csvContent += `"${item.filename}","${vLabel}","${(item.fake_score*100).toFixed(1)}%","${(item.real_score*100).toFixed(1)}%"\n`;
-    });
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "ai_image_spotter_batch_results.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
 
   // --- Inspect Log State ---
   const [inspectLog, setInspectLog] = useState(null);
@@ -425,9 +414,9 @@ export default function App() {
 
             <div className={result ? "grid-cols-3" : "grid-cols-2"}>
               {/* Column 1: Input Box / Active Image */}
-              <div>
+              <div className={result ? "card results-col-card" : ""}>
                 {!activeImageUri && (
-                  <div className="card">
+                  <div className={!result ? "card" : ""} style={!result ? {} : { height: '100%', display: 'flex', flexDirection: 'column' }}>
                     <h3 style={{ marginBottom: '1rem' }}>🖼️ Upload Target</h3>
                     <label className="dropzone">
                       <UploadCloud size={48} style={{ color: 'var(--primary-purple)' }} />
@@ -454,10 +443,10 @@ export default function App() {
                 )}
 
                 {activeImageUri && (
-                  <div className="card" style={{ textAlign: 'center' }}>
+                  <div className={!result ? "card" : ""} style={{ textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column' }}>
                     <h3 style={{ marginBottom: '1rem', textAlign: 'left' }}>📷 Active Image</h3>
-                    <div className="image-preview-box" style={{ marginBottom: '1rem' }}>
-                      <img src={activeImageUri} alt="Active preview" />
+                    <div className="image-preview-box" style={{ marginBottom: '1rem', flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <img src={activeImageUri} alt="Active preview" style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} />
                     </div>
                     <span style={{ display: 'block', marginBottom: '1.25rem', fontSize: '0.85rem', color: 'var(--text-slate)' }}>
                       Filename: {imageName}
@@ -466,7 +455,7 @@ export default function App() {
                     {result ? (
                       <button 
                         className="btn-purple" 
-                        style={{ width: '100%', padding: '0.9rem', fontSize: '1.05rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                        style={{ width: '100%', padding: '0.9rem', fontSize: '1.05rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginTop: 'auto' }}
                         onClick={() => {
                           setActiveImageUri("");
                           setActiveImageFile(null);
@@ -504,14 +493,12 @@ export default function App() {
               {/* Column 2: Detection & Probability when predicted, otherwise loaders/empty state */}
               {!result ? (
                 <div>
-                  {analyzing && (
+                  {analyzing ? (
                     <div className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '1rem' }}>
                       <div className="loader" style={{ width: '40px', height: '40px' }}></div>
                       <p style={{ fontWeight: 600, color: 'var(--primary-purple)', textAlign: 'center' }}>Analyzing pixel matrices via SigLIP Transformer...</p>
                     </div>
-                  )}
-
-                  {!analyzing && (
+                  ) : (
                     <div className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '1rem', color: 'var(--text-slate)', textAlign: 'center' }}>
                       <ImageIcon size={48} style={{ opacity: 0.3 }} />
                       <p>No image analyzed yet. Drop an image or select a sample to begin.</p>
@@ -519,17 +506,25 @@ export default function App() {
                   )}
                 </div>
               ) : (
-                <div>
+                <div className="card results-col-card" style={{ display: 'flex', flexDirection: 'column' }}>
                   {result.verdict === 'AI' ? (
-                    <div className="verdict-banner ai">
+                    <div className="verdict-banner ai" style={{ marginBottom: '1.5rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <ShieldAlert size={24} />
                         <h3>VERDICT: LIKELY AI-GENERATED</h3>
                       </div>
                       <p>{result.summary || `Our AI model found visual patterns that are more consistent with AI-generated images (${(result.fake_score*100).toFixed(1)}% confidence).`}</p>
                     </div>
+                  ) : result.verdict === 'UNCERTAIN' ? (
+                    <div className="verdict-banner uncertain" style={{ marginBottom: '1.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Info size={24} />
+                        <h3>VERDICT: UNCERTAIN</h3>
+                      </div>
+                      <p>{result.summary || `Our AI model found visual patterns that are highly ambiguous and could not definitively classify this image.`}</p>
+                    </div>
                   ) : (
-                    <div className="verdict-banner real">
+                    <div className="verdict-banner real" style={{ marginBottom: '1.5rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <Shield size={24} />
                         <h3>VERDICT: LIKELY REAL</h3>
@@ -538,7 +533,7 @@ export default function App() {
                     </div>
                   )}
 
-                  <div className="card" style={{ padding: '1.5rem' }}>
+                  <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                     <h3 style={{ marginBottom: '1rem' }}>📊 Prediction Probability</h3>
                     
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -568,139 +563,164 @@ export default function App() {
 
               {/* Column 3: Diagnostic Report when predicted */}
               {result && (
-                <div>
-                  <div className="card" style={{ margin: 0, height: '100%' }}>
-                    <h3>🧠 Why did we reach this verdict?</h3>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-slate)', marginBottom: '1.25rem' }}>
-                      Explainable evidence evaluated for {result.filename}:
-                    </p>
+                <div className="card results-col-card" style={{ margin: 0, display: 'flex', flexDirection: 'column' }}>
+                  <h3>🧠 Why did we reach this verdict?</h3>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-slate)', marginBottom: '1rem' }}>
+                    Explainable evidence evaluated for {result.filename}:
+                  </p>
 
-                    {result.diagnostic_report?.contradiction_note && (
-                      <div className="contradiction-notice">
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
-                          <Info size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
-                          <span>{result.diagnostic_report.contradiction_note}</span>
-                        </div>
+                  <div className="explanation-nav-bar">
+                    <button 
+                      className="nav-arrow-btn" 
+                      onClick={() => setActiveExplanationIndex(prev => Math.max(0, prev - 1))}
+                      disabled={activeExplanationIndex === 0}
+                    >
+                      <ChevronLeft size={20} />
+                    </button>
+                    
+                    <div className="carousel-dots">
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-slate)' }}>
+                        {activeExplanationIndex + 1} of {(result.diagnostic_report?.evidence_cards || result.reasons)?.length || 0}
+                      </span>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        {(result.diagnostic_report?.evidence_cards || result.reasons)?.map((_, i) => (
+                          <div 
+                            key={i} 
+                            style={{ 
+                              width: '6px', 
+                              height: '6px', 
+                              borderRadius: '50%', 
+                              backgroundColor: i === activeExplanationIndex ? 'var(--primary-purple)' : '#e2e8f0',
+                              transition: 'background-color 0.2s'
+                            }} 
+                          />
+                        ))}
                       </div>
-                    )}
-
-                    <div className="reasons-list">
-                      {result.diagnostic_report?.evidence_cards ? (
-                        result.diagnostic_report.evidence_cards.map((card, i) => (
-                          <div key={i} className={`reason-item-card ${card.status_type || 'neutral'}`}>
-                            <span className="reason-icon">{card.icon}</span>
-                            <div className="reason-content">
-                              <div className="evidence-header">
-                                <strong className="reason-label" style={{ marginBottom: 0 }}>{card.title}</strong>
-                                <span className={`status-badge ${card.status_type || 'neutral'}`}>
-                                  {card.status}
-                                </span>
-                              </div>
-                              <p className="reason-detail">{card.explanation}</p>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        result.reasons?.map((r, i) => {
-                          const isObj = typeof r === 'object' && r !== null;
-                          const type = isObj ? (r.type || 'neutral') : 'neutral';
-                          const icon = isObj ? r.icon : 'ℹ️';
-                          const label = isObj ? r.label : 'Diagnostic Audit';
-                          const detail = isObj ? r.detail : String(r).replace(/\*\*/g, '');
-                          
-                          return (
-                            <div key={i} className={`reason-item-card ${type}`}>
-                              <span className="reason-icon">{icon}</span>
-                              <div className="reason-content">
-                                <strong className="reason-label">{label}</strong>
-                                <p className="reason-detail">{detail}</p>
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
                     </div>
 
-                    {result.diagnostic_report?.technical_details && (
-                      <div>
-                        <button
-                          type="button"
-                          className="tech-toggle-btn"
-                          onClick={() => setShowTechDetails(prev => !prev)}
-                        >
-                          <span>View Technical Details</span>
-                          {showTechDetails ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                        </button>
-
-                        {showTechDetails && (
-                          <div className="tech-drawer">
-                            <div className="tech-grid">
-                              <div className="tech-metric-card">
-                                <span className="tech-metric-title">Model</span>
-                                <span className="tech-metric-value" style={{ fontSize: '0.92rem' }}>
-                                  {result.diagnostic_report.technical_details.model_name || 'SigLIP Classifier'}
-                                </span>
-                                <span className="tech-metric-sub">
-                                  AI: {(result.fake_score * 100).toFixed(1)}% | Real: {(result.real_score * 100).toFixed(1)}%
-                                </span>
-                              </div>
-                              <div className="tech-metric-card">
-                                <span className="tech-metric-title">Error Level Analysis</span>
-                                <span className="tech-metric-value">
-                                  {result.diagnostic_report.technical_details.ela_std}
-                                </span>
-                                <span className="tech-metric-sub">
-                                  Threshold: &gt; {result.diagnostic_report.technical_details.ela_threshold} std
-                                </span>
-                              </div>
-                              <div className="tech-metric-card">
-                                <span className="tech-metric-title">FFT Frequency</span>
-                                <span className="tech-metric-value">
-                                  {result.diagnostic_report.technical_details.fft_std}
-                                </span>
-                                <span className="tech-metric-sub">
-                                  Threshold: &gt; {result.diagnostic_report.technical_details.fft_threshold} std
-                                </span>
-                              </div>
-                              <div className="tech-metric-card">
-                                <span className="tech-metric-title">Metadata Audit</span>
-                                <span className="tech-metric-value">
-                                  {result.diagnostic_report.technical_details.has_exif ? `${result.diagnostic_report.technical_details.metadata_count} tags` : 'No EXIF'}
-                                </span>
-                                <span className="tech-metric-sub">
-                                  {result.diagnostic_report.technical_details.ai_signatures?.length > 0 
-                                    ? `AI Sigs: ${result.diagnostic_report.technical_details.ai_signatures.join(', ')}`
-                                    : 'No direct AI tags'}
-                                </span>
-                              </div>
-                            </div>
-
-                            {result.diagnostic_report.technical_details.metadata_tags && Object.keys(result.diagnostic_report.technical_details.metadata_tags).length > 0 && (
-                              <div style={{ marginTop: '0.75rem', maxHeight: '180px', overflowY: 'auto' }}>
-                                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-slate)' }}>Raw Metadata Headers:</span>
-                                <table className="exif-table" style={{ marginTop: '0.35rem', fontSize: '0.8rem' }}>
-                                  <thead>
-                                    <tr>
-                                      <th style={{ padding: '0.4rem 0.6rem' }}>Tag</th>
-                                      <th style={{ padding: '0.4rem 0.6rem' }}>Value</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {Object.entries(result.diagnostic_report.technical_details.metadata_tags).map(([k, v]) => (
-                                      <tr key={k}>
-                                        <td style={{ padding: '0.4rem 0.6rem', fontWeight: 600 }}>{k}</td>
-                                        <td style={{ padding: '0.4rem 0.6rem' }}>{String(v)}</td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    <button 
+                      className="nav-arrow-btn" 
+                      onClick={() => setActiveExplanationIndex(prev => Math.min(((result.diagnostic_report?.evidence_cards || result.reasons)?.length || 1) - 1, prev + 1))}
+                      disabled={activeExplanationIndex === ((result.diagnostic_report?.evidence_cards || result.reasons)?.length || 1) - 1}
+                    >
+                      <ChevronRight size={20} />
+                    </button>
                   </div>
+
+
+
+                  <div className="reasons-list" style={{ flexGrow: 1, overflowY: 'auto', marginBottom: '1rem' }}>
+                    {(() => {
+                      const reasons = result.diagnostic_report?.evidence_cards || result.reasons || [];
+                      const card = reasons[activeExplanationIndex];
+                      
+                      if (!card) return null;
+                      
+                      const isObj = typeof card === 'object' && card !== null;
+                      const type = card.status_type || (isObj ? card.type : 'neutral') || 'neutral';
+                      const icon = card.icon || (isObj ? card.icon : 'ℹ️');
+                      const label = card.title || (isObj ? card.label : 'Diagnostic Audit');
+                      const detail = card.explanation || (isObj ? card.detail : String(card).replace(/\*\*/g, ''));
+                      const status = card.status || '';
+
+                      return (
+                        <div className={`reason-item-card ${type}`} style={{ height: '100%', marginBottom: 0 }}>
+                          <span className="reason-icon" style={{ fontSize: '1.5rem' }}>{icon}</span>
+                          <div className="reason-content" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                            <div className="evidence-header" style={{ marginBottom: '0.5rem' }}>
+                              <strong className="reason-label" style={{ marginBottom: 0 }}>{label}</strong>
+                              {status && (
+                                <span className={`status-badge ${type}`}>
+                                  {status}
+                                </span>
+                              )}
+                            </div>
+                            <p className="reason-detail" style={{ flexGrow: 1 }}>{detail}</p>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {result.diagnostic_report?.technical_details && (
+                    <div style={{ marginTop: 'auto' }}>
+                      <button
+                        type="button"
+                        className="tech-toggle-btn"
+                        onClick={() => setShowTechDetails(prev => !prev)}
+                      >
+                        <span>View Technical Details</span>
+                        {showTechDetails ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                      </button>
+
+                      {showTechDetails && (
+                        <div className="tech-drawer">
+                          <div className="tech-grid">
+                            <div className="tech-metric-card">
+                              <span className="tech-metric-title">Model</span>
+                              <span className="tech-metric-value" style={{ fontSize: '0.92rem' }}>
+                                {result.diagnostic_report.technical_details.model_name || 'SigLIP Classifier'}
+                              </span>
+                              <span className="tech-metric-sub">
+                                AI: {(result.fake_score * 100).toFixed(1)}% | Real: {(result.real_score * 100).toFixed(1)}%
+                              </span>
+                            </div>
+                            <div className="tech-metric-card">
+                              <span className="tech-metric-title">Error Level Analysis</span>
+                              <span className="tech-metric-value">
+                                {result.diagnostic_report.technical_details.ela_std}
+                              </span>
+                              <span className="tech-metric-sub">
+                                Threshold: &gt; {result.diagnostic_report.technical_details.ela_threshold} std
+                              </span>
+                            </div>
+                            <div className="tech-metric-card">
+                              <span className="tech-metric-title">FFT Frequency</span>
+                              <span className="tech-metric-value">
+                                {result.diagnostic_report.technical_details.fft_std}
+                              </span>
+                              <span className="tech-metric-sub">
+                                Threshold: &gt; {result.diagnostic_report.technical_details.fft_threshold} std
+                              </span>
+                            </div>
+                            <div className="tech-metric-card">
+                              <span className="tech-metric-title">Metadata Audit</span>
+                              <span className="tech-metric-value">
+                                {result.diagnostic_report.technical_details.has_exif ? `${result.diagnostic_report.technical_details.metadata_count} tags` : 'No EXIF'}
+                              </span>
+                              <span className="tech-metric-sub">
+                                {result.diagnostic_report.technical_details.ai_signatures?.length > 0 
+                                  ? `AI Sigs: ${result.diagnostic_report.technical_details.ai_signatures.join(', ')}`
+                                  : 'No direct AI tags'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {result.diagnostic_report.technical_details.metadata_tags && Object.keys(result.diagnostic_report.technical_details.metadata_tags).length > 0 && (
+                            <div style={{ marginTop: '0.75rem', maxHeight: '180px', overflowY: 'auto' }}>
+                              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-slate)' }}>Raw Metadata Headers:</span>
+                              <table className="exif-table" style={{ marginTop: '0.35rem', fontSize: '0.8rem' }}>
+                                <thead>
+                                  <tr>
+                                    <th style={{ padding: '0.4rem 0.6rem' }}>Tag</th>
+                                    <th style={{ padding: '0.4rem 0.6rem' }}>Value</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {Object.entries(result.diagnostic_report.technical_details.metadata_tags).map(([k, v]) => (
+                                    <tr key={k}>
+                                      <td style={{ padding: '0.4rem 0.6rem', fontWeight: 600 }}>{k}</td>
+                                      <td style={{ padding: '0.4rem 0.6rem' }}>{String(v)}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -767,9 +787,9 @@ export default function App() {
                         <span style={{ 
                           fontSize: '0.8rem', 
                           fontWeight: 700, 
-                          color: log.verdict === 'AI' ? (inspectLog?.id === log.id ? '#ffffff' : 'var(--accent-ai)') : (inspectLog?.id === log.id ? '#ffffff' : 'var(--accent-real)')
+                          color: log.verdict === 'AI' ? (inspectLog?.id === log.id ? '#ffffff' : 'var(--accent-ai)') : (log.verdict === 'UNCERTAIN' ? (inspectLog?.id === log.id ? '#ffffff' : '#f59e0b') : (inspectLog?.id === log.id ? '#ffffff' : 'var(--accent-real)'))
                         }}>
-                          {log.verdict_label || (log.verdict === 'AI' ? 'Likely AI-Generated' : 'Likely Real')}
+                          {log.verdict_label || (log.verdict === 'AI' ? 'Likely AI-Generated' : (log.verdict === 'UNCERTAIN' ? 'Uncertain' : 'Likely Real'))}
                         </span>
                       </div>
                     ))}
@@ -798,10 +818,10 @@ export default function App() {
                                 borderRadius: '4px', 
                                 fontWeight: 700,
                                 fontSize: '1.25rem',
-                                color: inspectLog.verdict === 'AI' ? 'var(--accent-ai)' : 'var(--accent-real)',
-                                backgroundColor: inspectLog.verdict === 'AI' ? 'var(--accent-ai-bg)' : 'var(--accent-real-bg)'
+                                color: inspectLog.verdict === 'AI' ? 'var(--accent-ai)' : (inspectLog.verdict === 'UNCERTAIN' ? '#d97706' : 'var(--accent-real)'),
+                                backgroundColor: inspectLog.verdict === 'AI' ? 'var(--accent-ai-bg)' : (inspectLog.verdict === 'UNCERTAIN' ? '#fef3c7' : 'var(--accent-real-bg)')
                               }}>
-                                Verdict: {inspectLog.verdict_label || (inspectLog.verdict === 'AI' ? 'Likely AI-Generated' : 'Likely Real')}
+                                Verdict: {inspectLog.verdict_label || (inspectLog.verdict === 'AI' ? 'Likely AI-Generated' : (inspectLog.verdict === 'UNCERTAIN' ? 'Uncertain' : 'Likely Real'))}
                               </span>
                               {inspectLog.summary && (
                                 <p style={{ marginTop: '0.75rem', fontSize: '0.88rem', color: 'var(--text-slate)', lineHeight: '1.4' }}>
@@ -832,14 +852,7 @@ export default function App() {
                           </div>
                         </div>
 
-                        {inspectLog.diagnostic_report?.contradiction_note && (
-                          <div className="contradiction-notice" style={{ marginTop: '1.25rem' }}>
-                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
-                              <Info size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
-                              <span>{inspectLog.diagnostic_report.contradiction_note}</span>
-                            </div>
-                          </div>
-                        )}
+
 
                         <div style={{ marginTop: '1.5rem' }}>
                           <h4>Why did we reach this verdict?</h4>
@@ -998,14 +1011,8 @@ export default function App() {
             {batchResults.length > 0 && (
               <div>
                 <div className="card">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                  <div style={{ marginBottom: '1.5rem' }}>
                     <h3>📋 Batch Diagnostic Summary</h3>
-                    {!batching && (
-                      <button className="btn-purple" onClick={handleExportCSV}>
-                        <Download size={16} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
-                        Export Results (CSV)
-                      </button>
-                    )}
                   </div>
 
                   {batching && (
@@ -1033,6 +1040,12 @@ export default function App() {
                       </span>
                     </div>
                     <div className="stat-card">
+                      <span className="stat-label">Uncertain Flagged</span>
+                      <span className="stat-value" style={{ color: '#d97706' }}>
+                        {batchResults.filter(x => x.verdict === 'UNCERTAIN').length}
+                      </span>
+                    </div>
+                    <div className="stat-card">
                       <span className="stat-label">AI Ratio</span>
                       <span className="stat-value">
                         {((batchResults.filter(x => x.verdict === 'AI').length / batchResults.length) * 100).toFixed(0)}%
@@ -1056,9 +1069,9 @@ export default function App() {
                           <td style={{ fontWeight: 600 }}>{item.filename}</td>
                           <td style={{ 
                             fontWeight: 700, 
-                            color: item.verdict === 'AI' ? 'var(--accent-ai)' : (item.verdict === 'REAL' ? 'var(--accent-real)' : '#6b7280') 
+                            color: item.verdict === 'AI' ? 'var(--accent-ai)' : (item.verdict === 'REAL' ? 'var(--accent-real)' : (item.verdict === 'UNCERTAIN' ? '#d97706' : '#6b7280'))
                           }}>
-                            {item.verdict_label || (item.verdict === 'AI' ? 'Likely AI-Generated' : (item.verdict === 'REAL' ? 'Likely Real' : item.verdict))}
+                            {item.verdict_label || (item.verdict === 'AI' ? 'Likely AI-Generated' : (item.verdict === 'REAL' ? 'Likely Real' : (item.verdict === 'UNCERTAIN' ? 'Uncertain' : item.verdict)))}
                           </td>
                           <td>{(item.fake_score*100).toFixed(1)}%</td>
                           <td>{(item.real_score*100).toFixed(1)}%</td>
@@ -1071,7 +1084,7 @@ export default function App() {
                 <div className="card">
                   <h3>🖼️ Grid Results Gallery</h3>
                   <p style={{ color: 'var(--text-slate)', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
-                    Visual gallery results. Green border signifies Likely Real, Red border signifies Likely AI-Generated.
+                    Visual gallery results. Green border signifies Likely Real, Red border signifies Likely AI-Generated, and Amber border signifies Uncertain.
                   </p>
 
                   <div className="batch-grid">
@@ -1079,10 +1092,10 @@ export default function App() {
                       <div 
                         key={item.id} 
                         className="batch-thumb-card"
-                        style={{ borderColor: item.verdict === 'AI' ? 'var(--accent-ai)' : (item.verdict === 'REAL' ? 'var(--accent-real)' : '#e2e8f0') }}
+                        style={{ borderColor: item.verdict === 'AI' ? 'var(--accent-ai)' : (item.verdict === 'REAL' ? 'var(--accent-real)' : (item.verdict === 'UNCERTAIN' ? '#f59e0b' : '#e2e8f0')) }}
                       >
-                        <span className={`batch-badge ${item.verdict === 'AI' ? 'ai' : 'real'}`}>
-                          {item.verdict_label || (item.verdict === 'AI' ? 'Likely AI-Generated' : (item.verdict === 'REAL' ? 'Likely Real' : item.verdict))}
+                        <span className={`batch-badge ${item.verdict === 'AI' ? 'ai' : (item.verdict === 'UNCERTAIN' ? 'uncertain' : 'real')}`}>
+                          {item.verdict_label || (item.verdict === 'AI' ? 'Likely AI-Generated' : (item.verdict === 'REAL' ? 'Likely Real' : (item.verdict === 'UNCERTAIN' ? 'Uncertain' : item.verdict)))}
                         </span>
                         <p style={{ fontSize: '0.75rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>
                           {item.filename}

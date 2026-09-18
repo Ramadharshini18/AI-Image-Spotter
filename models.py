@@ -60,7 +60,12 @@ def classify_image(image: Image.Image, model_id: str = DEFAULT_MODEL) -> dict:
         else:
             fake_score, real_score = 0.5, 0.5
             
-        verdict = "AI" if fake_score >= 0.50 else "REAL"
+        if fake_score > 0.60:
+            verdict = "AI"
+        elif fake_score < 0.40:
+            verdict = "REAL"
+        else:
+            verdict = "UNCERTAIN"
         
         return {
             "success": True,
